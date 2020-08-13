@@ -16,6 +16,8 @@ class CrawlCache {
             url VARCHAR(2083) NOT NULL,
             page_hash CHAR(32) NOT NULL,
             time datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+            status SMALLINT DEFAULT 200 NOT NULL,
+            redirect_to VARCHAR(2083) NULL,
             PRIMARY KEY  (hashed_url)
         ) $charset_collate;";
 
@@ -34,30 +36,31 @@ class CrawlCache {
 
         $table_name = $wpdb->prefix . 'wp2static_crawl_cache';
 
-        $rows = $wpdb->get_results( "SELECT hashed_url FROM $table_name" );
-
-        foreach ( $rows as $row ) {
-            $urls[] = $row->hashed_url;
-        }
+        $urls = $wpdb->get_col( "SELECT hashed_url FROM $table_name" );
 
         return $urls;
     }
 
-    public static function addUrl( string $url, string $page_hash ) : void {
+    public static function addUrl( string $url, string $page_hash, int $status,
+                                   ?string $redirect_to ) : void {
         global $wpdb;
 
         $table_name = $wpdb->prefix . 'wp2static_crawl_cache';
-        $sql = "insert into {$table_name} (time, hashed_url, url, page_hash)
-                VALUES (%s, %s, %s, %s) ON DUPLICATE KEY
-                UPDATE time = %s, page_hash = %s";
+        $sql = "insert into {$table_name} (time, hashed_url, url, page_hash, status, redirect_to)
+                VALUES (%s, %s, %s, %s, %s, %s) ON DUPLICATE KEY
+                UPDATE time = %s, page_hash = %s, status = %s, redirect_to = %s";
         $sql = $wpdb->prepare(
             $sql,
             current_time( 'mysql' ),
             md5( $url ),
             $url,
             $page_hash,
+            $status,
+            $redirect_to,
             current_time( 'mysql' ),
-            $page_hash
+            $page_hash,
+            $status,
+            $redirect_to
         );
 
         $wpdb->query( $sql );
@@ -115,7 +118,6 @@ class CrawlCache {
                 'hashed_url' => md5( $url ),
             ]
         );
-        WsLog::l( "Removed {$url} from Crawl Cache" );
     }
 
     /**
@@ -148,5 +150,28 @@ class CrawlCache {
         $total = $wpdb->get_var( "SELECT count(*) FROM $table_name" );
 
         return $total;
+    }
+
+    /**
+     * @param mixed[] $redirs
+     * @return mixed[] redirects
+     */
+    public static function wp2static_list_redirects( array $redirs ) : array {
+        global $wpdb;
+
+        $table_name = $wpdb->prefix . 'wp2static_crawl_cache';
+
+        $rows = $wpdb->get_results(
+            "SELECT url, redirect_to FROM $table_name WHERE 0 < LENGTH(redirect_to)"
+        );
+
+        foreach ( $rows as $row ) {
+            $redirs[ $row->url ] = [
+                'url' => $row->url,
+                'redirect_to' => $row->redirect_to,
+            ];
+        }
+
+        return $redirs;
     }
 }

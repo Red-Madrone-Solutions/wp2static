@@ -18,7 +18,7 @@
         "source": "https://github.com/WP2Static/wp2static"
     },
     "require": {
-        "php": ">=7.2",
+        "php": ">=7.3",
         "wa72/url": "^0.7.1"
     },
     "require-dev": {
@@ -29,8 +29,8 @@
         "phpunit/phpunit": "*",
         "dealerdirect/phpcodesniffer-composer-installer": "*",
         "wp-coding-standards/wpcs": "*",
-        "jakub-onderka/php-parallel-lint": "*",
-        "10up/wp_mock": "^0.4.2"
+        "phpcompatibility/php-compatibility": "*",
+        "php-parallel-lint/php-parallel-lint": "*"
     },
     "autoload": {
         "psr-4": {
@@ -45,7 +45,7 @@
     },
     "config": {
         "platform": {
-          "php": "7.2.17"
+          "php": "7.3"
         },
         "preferred-install": {
             "*": "dist"
@@ -53,17 +53,19 @@
         "classmap-authoritative": true
     },
     "scripts": {
-        "phpstan": "vendor/bin/phpstan analyse --memory-limit=4G",
+        "phpstan": "php -d memory_limit=-1 ./vendor/bin/phpstan analyse",
         "phpcs": "vendor/bin/phpcs --standard=./tools/phpcs.xml --ignore=*/tests/*,*/admin/*,**/coverage/*,*.js,*/vendor/*,*/views/*.php ./",
+        "phpcs72": "vendor/bin/phpcs --standard=PHPCompatibility --runtime-set testVersion 7.2 --ignore=*/tests/*,*/admin/*,**/coverage/*,*.js,*/vendor/*,*/views/*.php ./",
         "phpcbf": "vendor/bin/phpcbf --standard=./tools/phpcs.xml --ignore=*/js/*,*/tests/*,*/admin/*,*/coverage/*,*.js,*/vendor/*,*/views/*.php ./",
         "phpunit": "vendor/bin/phpunit ./tests/unit/",
         "coverage": "vendor/bin/phpunit tests/unit --coverage-html coverage --whitelist src/",
         "lint": "vendor/bin/parallel-lint --exclude vendor .",
         "test": [
+            "composer validate --strict",
             "@lint",
             "@phpcs",
-            "@phpstan",
-            "@phpunit"
+            "@phpcs72",
+            "@phpstan"
         ],
         "build": "/bin/sh tools/build_release.sh",
         "post-install-cmd": "sh ./tools/composer-post-install.sh"

@@ -8,12 +8,18 @@
  * Author URI:  https://wp2static.com
  * Text Domain: static-html-output-plugin
  *
- * @package     WP_Static_HTML_Output
+ * @package     WP2Static
  */
+
+if ( ! defined( 'WPINC' ) ) {
+    die;
+}
 
 define( 'WP2STATIC_PATH', plugin_dir_path( __FILE__ ) );
 
-require WP2STATIC_PATH . 'vendor/autoload.php';
+if ( file_exists( WP2STATIC_PATH . 'vendor/autoload.php' ) ) {
+    require_once WP2STATIC_PATH . 'vendor/autoload.php';
+}
 
 WP2Static\Controller::init( __FILE__ );
 
@@ -47,9 +53,6 @@ remove_action( 'wp_print_styles', 'print_emoji_styles' );
 
 if ( defined( 'WP_CLI' ) ) {
     WP_CLI::add_command( 'wp2static', 'WP2Static\CLI' );
-    WP_CLI::add_command(
-        'wp2static options',
-        [ 'WP2Static\CLI', 'options' ]
-    );
+    WP_CLI::add_command( 'wp2static options', [ 'WP2Static\CLI', 'options' ] );
 }
 

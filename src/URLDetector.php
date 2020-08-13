@@ -18,7 +18,7 @@ class URLDetector {
      * Detect URLs within site
      */
     public static function detectURLs() : string {
-        \WP2Static\WsLog::l( 'Starting to detect WordPress site URLs.' );
+        WsLog::l( 'Starting to detect WordPress site URLs.' );
 
         $arrays_to_merge = [];
 
@@ -130,16 +130,15 @@ class URLDetector {
 
         $unique_urls = array_unique( $url_queue );
 
-        // truncate before adding
-        // TODO: use inert unique instead here, allowing to skip heavy
-        // detection between runs without blowing away previously detected URLs...
-        CrawlQueue::truncate();
+        // No longer truncate before adding
+        // addUrls is now doing INSERT IGNORE based on URL hash to be
+        // additive and not error on duplicate
 
         CrawlQueue::addUrls( $unique_urls );
 
         $total_detected = (string) count( $unique_urls );
 
-        \WP2Static\WsLog::l(
+        WsLog::l(
             "Detection complete. $total_detected URLs added to Crawl Queue."
         );
 

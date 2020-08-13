@@ -18,6 +18,7 @@ class ViewRenderer {
             'detectPages' => CoreOptions::get( 'detectPages' ),
             'detectPosts' => CoreOptions::get( 'detectPosts' ),
             'detectUploads' => CoreOptions::get( 'detectUploads' ),
+            'deploymentURL' => CoreOptions::get( 'deploymentURL' ),
             'useCrawlCaching' => CoreOptions::get( 'useCrawlCaching' ),
         ];
 
@@ -29,7 +30,7 @@ class ViewRenderer {
         $view['memoryLimit'] = ini_get( 'memory_limit' );
         $view['coreOptions'] = CoreOptions::getAll();
         $view['site_info'] = SiteInfo::getAllInfo();
-        $view['phpOutOfDate'] = PHP_VERSION < 7.3;
+        $view['phpOutOfDate'] = PHP_VERSION < 7.4;
         $view['uploadsWritable'] = SiteInfo::isUploadsWritable();
         $view['maxExecutionTime'] = ini_get( 'max_execution_time' );
         $view['curlSupported'] = SiteInfo::hasCURLSupport();
@@ -62,8 +63,42 @@ class ViewRenderer {
             die( 'Forbidden' );
         }
 
+        if ( ! empty( $_GET['action'] ) && ! empty( $_GET['id'] ) && is_array( $_GET['id'] ) ) {
+            switch ( $_GET['action'] ) {
+                case 'remove':
+                    CrawlQueue::rmUrlsById( $_GET['id'] );
+                    break;
+            }
+        }
+
+        $urls = CrawlQueue::getCrawlablePaths();
+        // Apply search
+        if ( ! empty( $_GET['s'] ) ) {
+            $s = $_GET['s'];
+            $urls = array_filter(
+                $urls,
+                function ( $url ) use ( $s ) {
+                    return stripos( $url, $s ) !== false;
+                }
+            );
+        }
+
+        $page_rows = 200;
         $view = [];
-        $view['urls'] = CrawlQueue::getCrawlablePaths();
+        // Pagination vars
+        $view['total_count'] = count( $urls );
+        $view['page'] = isset( $_GET['paged'] ) ? max( 1, intval( $_GET['paged'] ) ) : 1;
+        $view['pages'] = intval( ceil( $view['total_count'] / $page_rows ) );
+        $view['page_rows'] = $page_rows;
+        // URLs to display
+        // Because array_slice doesn't preserve integer keys, we need to split
+        // the array into keys and values, array_slice each then recombine
+        $keys = array_keys( $urls );
+        $values = array_values( $urls );
+        $view['urls'] = array_combine(
+            array_slice( $keys, ( $view['page'] - 1 ) * $page_rows, $page_rows ),
+            array_slice( $values, ( $view['page'] - 1 ) * $page_rows, $page_rows )
+        );
 
         require_once WP2STATIC_PATH . 'views/crawl-queue-page.php';
     }
@@ -111,7 +146,10 @@ class ViewRenderer {
         }
 
         $view = [];
-        $view['paths'] = DeployCache::getPaths();
+        $view['paths']
+            = isset( $_GET['deploy_namespace'] )
+            ? DeployCache::getPaths( $_GET['deploy_namespace'] )
+            : DeployCache::getPaths();
 
         require_once WP2STATIC_PATH . 'views/deploy-cache-page.php';
     }
@@ -213,6 +251,12 @@ class ViewRenderer {
         $view['crawlQueueTotalURLs'] = CrawlQueue::getTotal();
         $view['crawlCacheTotalURLs'] = CrawlCache::getTotal();
         $view['deployCacheTotalPaths'] = DeployCache::getTotal();
+
+        if ( apply_filters( 'wp2static_deploy_cache_totals_by_namespace', false ) ) {
+            $view['deployCacheTotalPathsByNamespace']
+                = DeployCache::getTotalsByNamespace();
+        }
+
         $view['uploads_path'] = SiteInfo::getPath( 'uploads' );
         $view['nonce_action'] = 'wp2static-caches-page';
 

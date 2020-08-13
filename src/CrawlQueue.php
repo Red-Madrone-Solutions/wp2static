@@ -14,6 +14,7 @@ class CrawlQueue {
         $sql = "CREATE TABLE $table_name (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
             url VARCHAR(2083) NOT NULL,
+            hashed_url CHAR(32) NOT NULL UNIQUE,
             PRIMARY KEY  (id)
         ) $charset_collate;";
 
@@ -30,21 +31,26 @@ class CrawlQueue {
         global $wpdb;
 
         $table_name = $wpdb->prefix . 'wp2static_urls';
+        $url_count = count( $urls );
 
-        $placeholders = [];
-        $values = [];
+        while ( $url_count ) {
+            $chunk = array_slice( $urls, 0, 100 );
+            $urls = array_slice( $urls, 100 );
+            $url_count = count( $urls );
+            $placeholders = array_fill( 0, count( $chunk ), '(%s, %s)' );
+            $values = [];
 
-        foreach ( $urls as $url ) {
-            $placeholders[] = '(%s)';
-            $values[] = rawurldecode( $url );
+            foreach ( $chunk as $url ) {
+                array_push( $values, md5( $url ), rawurldecode( $url ) );
+            }
+
+            $query_string =
+                'INSERT IGNORE INTO ' . $table_name . ' (hashed_url, url) VALUES ' .
+                implode( ', ', $placeholders );
+            $query = $wpdb->prepare( $query_string, $values );
+
+            $wpdb->query( $query );
         }
-
-        $query_string =
-            'INSERT INTO ' . $table_name . ' (url) VALUES ' .
-            implode( ', ', $placeholders );
-        $query = $wpdb->prepare( $query_string, $values );
-
-        $wpdb->query( $query );
     }
 
     /**
@@ -58,13 +64,35 @@ class CrawlQueue {
 
         $table_name = $wpdb->prefix . 'wp2static_urls';
 
-        $rows = $wpdb->get_results( "SELECT url FROM $table_name ORDER by url ASC" );
+        $rows = $wpdb->get_results( "SELECT id, url FROM $table_name ORDER by url ASC" );
 
         foreach ( $rows as $row ) {
-            $urls[] = $row->url;
+            $urls[ $row->id ] = $row->url;
         }
 
         return $urls;
+    }
+
+    /**
+     * Remove multiple URLs at once
+     *
+     * @param array<string> $ids
+     * @return void
+     */
+    public static function rmUrlsById( array $ids ) : void {
+        global $wpdb;
+
+        $ids = array_map(
+            function ( string $id ) {
+                return absint( $id );
+            },
+            $ids
+        );
+        $ids = implode( ',', array_map( 'absint', $ids ) );
+
+        $table_name = $wpdb->prefix . 'wp2static_urls';
+
+        $wpdb->query( "DELETE FROM $table_name WHERE ID IN($ids)" );
     }
 
     /**
